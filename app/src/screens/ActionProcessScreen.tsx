@@ -1,13 +1,16 @@
 /**
  * M5 조치 처리 — ActionStepper로 POST ack → assign → resolve
  * 스테퍼 단계=status 매핑. 연타 방지. 409 안내+최신 재조회.
+ *
+ * 낙관적 갱신은 mutations.ts의 onMutate에서 react-query 캐시를 직접 조작.
+ * → 버튼 탭 즉시 스테퍼 전진, 실패 시 onError에서 자동 롤백.
  */
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useEventDetailQuery } from '../api/queries';
 import { useAckMutation, useAssignMutation, useResolveMutation } from '../api/mutations';
 import { useAuthStore } from '../stores/authStore';
-import { useEventStore, SafegaiEvent } from '../stores/eventStore';
+import { SafegaiEvent } from '../stores/eventStore';
 import { ActionStepper } from '../components/ActionStepper';
 import { SeverityBadge } from '../components/SeverityBadge';
 import { LoadingState, ErrorState } from '../components/StateViews';
@@ -19,35 +22,24 @@ interface Props { route: any; navigation: any; }
 export function ActionProcessScreen({ route, navigation }: Props) {
   const { eventId } = route.params;
   const { role, userId } = useAuthStore();
-  const { optimisticUpdateStatus, rollbackEvent } = useEventStore();
   const { data: event, isLoading, isError, error, refetch } = useEventDetailQuery(eventId);
   const ackMut = useAckMutation();
   const assignMut = useAssignMutation();
   const resolveMut = useResolveMutation();
   const isMutating = ackMut.isPending || assignMut.isPending || resolveMut.isPending;
 
-
-  const handleAction = async (toStatus: SafegaiEvent['status']) => {
+  const handleAction = (toStatus: SafegaiEvent['status']) => {
     if (!event || isMutating) return;
-    const prev = optimisticUpdateStatus(eventId, toStatus);
-    try {
-      switch (toStatus) {
-        case 'ACKED':
-          await ackMut.mutateAsync(eventId);
-          break;
-        case 'IN_PROGRESS':
-          await assignMut.mutateAsync({ eventId, userId: userId! });
-          break;
-        case 'RESOLVED':
-          await resolveMut.mutateAsync({ eventId });
-          break;
-      }
-    } catch (err: any) {
-      if (prev) rollbackEvent(prev);
-      if (err?.response?.status !== 409) {
-        Alert.alert('오류', '처리에 실패했습니다. 다시 시도해 주세요.');
-      }
-      refetch();
+    switch (toStatus) {
+      case 'ACKED':
+        ackMut.mutate(eventId);
+        break;
+      case 'IN_PROGRESS':
+        assignMut.mutate({ eventId, userId: userId! });
+        break;
+      case 'RESOLVED':
+        resolveMut.mutate({ eventId });
+        break;
     }
   };
 

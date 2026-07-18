@@ -1,9 +1,16 @@
 /**
  * API mutations — ack, assign, resolve (§6.3, spec-b.md §4)
- * useMutation + invalidate + 409 처리. POST 재시도 금지(§6.2).
+ *
+ * 낙관적 갱신(optimistic update)을 react-query 방식으로 구현:
+ * - onMutate: cancelQueries → getQueryData(prev) → setQueryData(목표상태) → return {prev}
+ * - onError: setQueryData(prev)로 즉시 롤백 + 409 Alert
+ * - onSettled: ['event',id] + ['events'] + ['siteState'] invalidate
+ *
+ * POST 재시도 금지(§6.2). 엔드포인트는 spec-b.md §4 그대로.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, ApiResponse } from './client';
+import { SafegaiEvent } from '../stores/eventStore';
 import { Alert } from 'react-native';
 
 interface AckResult { eventId: string; status: string }
@@ -20,13 +27,24 @@ export function useAckMutation() {
       const res = await apiClient.post<ApiResponse<AckResult>>(`/events/${eventId}/ack`);
       return res.data.data!;
     },
-    onSuccess: (_data, eventId) => {
-      qc.invalidateQueries({ queryKey: ['events'] });
-      qc.invalidateQueries({ queryKey: ['event', eventId] });
-      qc.invalidateQueries({ queryKey: ['siteState'] });
+    onMutate: async (eventId) => {
+      await qc.cancelQueries({ queryKey: ['event', eventId] });
+      const prev = qc.getQueryData<SafegaiEvent>(['event', eventId]);
+      qc.setQueryData<SafegaiEvent | undefined>(['event', eventId], (old) =>
+        old ? { ...old, status: 'ACKED' } : old,
+      );
+      return { prev };
     },
-    onError: (error: any) => {
+    onError: (error: any, eventId, context) => {
+      if (context?.prev) {
+        qc.setQueryData(['event', eventId], context.prev);
+      }
       handle409(error);
+    },
+    onSettled: (_data, _error, eventId) => {
+      qc.invalidateQueries({ queryKey: ['event', eventId] });
+      qc.invalidateQueries({ queryKey: ['events'] });
+      qc.invalidateQueries({ queryKey: ['siteState'] });
     },
   });
 }
@@ -41,13 +59,24 @@ export function useAssignMutation() {
       const res = await apiClient.post<ApiResponse<AssignResult>>(`/events/${eventId}/assign`, { userId });
       return res.data.data!;
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['events'] });
-      qc.invalidateQueries({ queryKey: ['event', vars.eventId] });
-      qc.invalidateQueries({ queryKey: ['siteState'] });
+    onMutate: async ({ eventId }) => {
+      await qc.cancelQueries({ queryKey: ['event', eventId] });
+      const prev = qc.getQueryData<SafegaiEvent>(['event', eventId]);
+      qc.setQueryData<SafegaiEvent | undefined>(['event', eventId], (old) =>
+        old ? { ...old, status: 'IN_PROGRESS' } : old,
+      );
+      return { prev };
     },
-    onError: (error: any) => {
+    onError: (error: any, vars, context) => {
+      if (context?.prev) {
+        qc.setQueryData(['event', vars.eventId], context.prev);
+      }
       handle409(error);
+    },
+    onSettled: (_data, _error, vars) => {
+      qc.invalidateQueries({ queryKey: ['event', vars.eventId] });
+      qc.invalidateQueries({ queryKey: ['events'] });
+      qc.invalidateQueries({ queryKey: ['siteState'] });
     },
   });
 }
@@ -62,19 +91,30 @@ export function useResolveMutation() {
       const res = await apiClient.post<ApiResponse<ResolveResult>>(`/events/${eventId}/resolve`, { note });
       return res.data.data!;
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['events'] });
-      qc.invalidateQueries({ queryKey: ['event', vars.eventId] });
-      qc.invalidateQueries({ queryKey: ['siteState'] });
+    onMutate: async ({ eventId }) => {
+      await qc.cancelQueries({ queryKey: ['event', eventId] });
+      const prev = qc.getQueryData<SafegaiEvent>(['event', eventId]);
+      qc.setQueryData<SafegaiEvent | undefined>(['event', eventId], (old) =>
+        old ? { ...old, status: 'RESOLVED' } : old,
+      );
+      return { prev };
     },
-    onError: (error: any) => {
+    onError: (error: any, vars, context) => {
+      if (context?.prev) {
+        qc.setQueryData(['event', vars.eventId], context.prev);
+      }
       handle409(error);
+    },
+    onSettled: (_data, _error, vars) => {
+      qc.invalidateQueries({ queryKey: ['event', vars.eventId] });
+      qc.invalidateQueries({ queryKey: ['events'] });
+      qc.invalidateQueries({ queryKey: ['siteState'] });
     },
   });
 }
 
 /**
- * 409 STATE_CONFLICT → '다른 관리자가 먼저 처리했습니다' 안내 + 최신 재조회
+ * 409 STATE_CONFLICT → '다른 관리자가 먼저 처리했습니다' 안내
  */
 function handle409(error: any) {
   if (error?.response?.status === 409) {
