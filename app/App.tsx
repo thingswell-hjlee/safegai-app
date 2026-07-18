@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { initAmplify } from './src/utils/amplify';
 import { useAuthStore } from './src/stores/authStore';
+import { setupNotificationChannels, subscribeTokenRefresh } from './src/push';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,10 @@ export default function App() {
 
   useEffect(() => {
     tryRestoreSession();
+    // 알림 채널 설정 + 토큰 refresh 리스너
+    setupNotificationChannels();
+    const unsubRefresh = subscribeTokenRefresh();
+    return () => { unsubRefresh(); };
   }, [tryRestoreSession]);
 
   return (

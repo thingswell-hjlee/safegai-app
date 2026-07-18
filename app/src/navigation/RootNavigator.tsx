@@ -1,21 +1,69 @@
 /**
- * RootNavigator — 인증 상태 기반 분기 + M1/M3/M4/M5 네비게이션
+ * RootNavigator — 인증 상태 기반 분기 + M1/M3/M4/M5/M8 + 딥링크 + 인앱배너
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useNavigation, NavigationContainerRef } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
+import { pushStore } from '../stores/pushStore';
 import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { EventListScreen } from '../screens/EventListScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { ActionProcessScreen } from '../screens/ActionProcessScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
+import { InAppBanner } from '../components/InAppBanner';
+import {
+  subscribeForegroundMessages,
+  subscribeNotificationOpened,
+  getInitialDeepLink,
+} from '../push/messaging';
 import { colors } from '../theme/tokens';
 
 const Stack = createNativeStackNavigator();
 
 export function RootNavigator() {
   const { isAuthenticated, isLoading } = useAuthStore();
+  const queryClient = useQueryClient();
+  const navigationRef = useRef<any>(null);
+
+  // 딥링크 + 포그라운드 메시지 리스너
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // 포그라운드 메시지
+    const unsubMsg = subscribeForegroundMessages(queryClient);
+
+    // 백그라운드 알림 탭 → M4 이동
+    const unsubOpened = subscribeNotificationOpened((eventId) => {
+      navigationRef.current?.navigate('EventDetail', { eventId });
+    });
+
+    // 종료 상태에서 알림 탭으로 앱 열림
+    getInitialDeepLink().then((eventId) => {
+      if (eventId) {
+        // 약간의 지연으로 네비게이션 준비 대기
+        setTimeout(() => {
+          navigationRef.current?.navigate('EventDetail', { eventId });
+        }, 500);
+      }
+    });
+
+    // pending 딥링크 처리 (미로그인→로그인 후)
+    const pendingId = pushStore.getState().consumePendingDeepLink();
+    if (pendingId) {
+      setTimeout(() => {
+        navigationRef.current?.navigate('EventDetail', { eventId: pendingId });
+      }, 500);
+    }
+
+    return () => {
+      unsubMsg();
+      unsubOpened();
+    };
+  }, [isAuthenticated, queryClient]);
 
   if (isLoading) {
     return (
@@ -25,19 +73,29 @@ export function RootNavigator() {
     );
   }
 
+  const handleBannerPress = (eventId: string) => {
+    navigationRef.current?.navigate('EventDetail', { eventId });
+  };
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {isAuthenticated ? (
-        <>
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="EventList" component={EventListScreen} />
-          <Stack.Screen name="EventDetail" component={EventDetailScreen} />
-          <Stack.Screen name="ActionProcess" component={ActionProcessScreen} />
-        </>
-      ) : (
-        <Stack.Screen name="Login" component={LoginScreen} />
-      )}
-    </Stack.Navigator>
+    <View style={{ flex: 1 }} ref={navigationRef}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isAuthenticated ? (
+          <>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="EventList" component={EventListScreen} />
+            <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+            <Stack.Screen name="ActionProcess" component={ActionProcessScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+          </>
+        ) : (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        )}
+      </Stack.Navigator>
+
+      {/* 인앱 배너 (포그라운드 알림) */}
+      {isAuthenticated && <InAppBanner onPress={handleBannerPress} />}
+    </View>
   );
 }
 

@@ -5,6 +5,8 @@
  */
 import { create } from 'zustand';
 import { signIn, signOut, restoreSession, UserRole } from '../utils/auth';
+import { registerPushToken, unregisterPushToken } from '../push/token';
+import { requestNotificationPermission } from '../push/channels';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -43,6 +45,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         idToken: result.idToken,
         error: null,
       });
+      // 로그인 성공 후 FCM 토큰 등록 (push-policy §5)
+      requestNotificationPermission().then(() => registerPushToken()).catch(() => {});
     } catch (err: any) {
       const message =
         err?.message === 'Incorrect username or password.'
@@ -53,6 +57,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    // 로그아웃 시 FCM 토큰 해제 (push-policy §5)
+    await unregisterPushToken();
     await signOut();
     set({
       isAuthenticated: false,
