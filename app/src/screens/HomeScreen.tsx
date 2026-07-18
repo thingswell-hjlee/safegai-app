@@ -50,6 +50,9 @@ export function HomeScreen({ navigation }: Props) {
         </View>
         <View style={styles.headerRight}>
           <FreshnessLabel lastUpdatedAt={lastUpdated} />
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>설정</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
             <Text style={styles.logoutText}>로그아웃</Text>
           </TouchableOpacity>
