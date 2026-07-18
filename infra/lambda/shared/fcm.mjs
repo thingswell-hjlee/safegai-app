@@ -1,9 +1,10 @@
 /**
  * shared/fcm.mjs — FCM 전송 모듈
  * Google OAuth2 + FCM HTTP v1 API 사용
+ * Node 내장 crypto로 RS256 JWT 서명 (외부 의존성 없음)
  */
+import { createSign } from 'node:crypto';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
-import { SignJWT, importPKCS8 } from 'jose';
 
 const smClient = new SecretsManagerClient({ region: 'ap-northeast-2' });
 const FCM_SECRET_ARN = process.env.FCM_SECRET_ARN;
@@ -25,6 +26,35 @@ async function getServiceAccountKey() {
   return cachedCredentials;
 }
 
+// ─── Node crypto RS256 JWT 서명 ──────────────────────────────────────
+
+/**
+ * Base64url 인코딩 (패딩 제거)
+ */
+function base64url(input) {
+  const buf = typeof input === 'string' ? Buffer.from(input, 'utf8') : input;
+  return buf.toString('base64url');
+}
+
+/**
+ * RS256 JWT 생성 (Node 내장 crypto 사용)
+ */
+function signJwtRS256(payload, privateKeyPem) {
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const segments = [
+    base64url(JSON.stringify(header)),
+    base64url(JSON.stringify(payload)),
+  ];
+  const signingInput = segments.join('.');
+
+  const sign = createSign('RSA-SHA256');
+  sign.update(signingInput);
+  sign.end();
+  const signature = sign.sign(privateKeyPem, 'base64url');
+
+  return `${signingInput}.${signature}`;
+}
+
 /**
  * Google OAuth2 액세스 토큰 발급 (JWT assertion)
  */
@@ -35,17 +65,17 @@ async function getAccessToken() {
   }
 
   const sa = await getServiceAccountKey();
-  const privateKey = await importPKCS8(sa.private_key, 'RS256');
 
-  const jwt = await new SignJWT({
-    scope: 'https://www.googleapis.com/auth/firebase.messaging',
-  })
-    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
-    .setIssuer(sa.client_email)
-    .setAudience('https://oauth2.googleapis.com/token')
-    .setIssuedAt(now)
-    .setExpirationTime(now + 3600)
-    .sign(privateKey);
+  const jwt = signJwtRS256(
+    {
+      iss: sa.client_email,
+      aud: 'https://oauth2.googleapis.com/token',
+      scope: 'https://www.googleapis.com/auth/firebase.messaging',
+      iat: now,
+      exp: now + 3600,
+    },
+    sa.private_key,
+  );
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',

@@ -78,6 +78,17 @@ export async function upsertDevice(deviceId, siteId, online, lastStatus) {
 }
 
 /**
+ * 단건 디바이스 조회
+ */
+export async function getDevice(deviceId) {
+  const res = await ddb.send(new GetCommand({
+    TableName: DEVICES_TABLE,
+    Key: { deviceId },
+  }));
+  return res.Item || null;
+}
+
+/**
  * 단건 이벤트 조회
  */
 export async function getEvent(eventId) {

@@ -13,6 +13,7 @@ import {
   putEventIfNew,
   updateEventCurrentValue,
   upsertDevice,
+  getDevice,
   getUsersBySite,
 } from '../shared/db.mjs';
 import { getPushTargetRoles } from '../shared/auth.mjs';
@@ -35,7 +36,7 @@ export const handler = async (event) => {
   try {
     // ─── 생명주기 이벤트 감지 ──────────────────────────────────────
     if (isLifecycleEvent(event)) {
-      evt = buildGatewayOfflineFault(event);
+      evt = await buildGatewayOfflineFault(event);
       console.log('Lifecycle → FAULT:', JSON.stringify(evt));
     } else {
       evt = event;
@@ -105,13 +106,24 @@ function isLifecycleEvent(event) {
 
 /**
  * 생명주기 disconnected → GATEWAY_OFFLINE FAULT 이벤트 생성
+ * devices 테이블에서 deviceId로 siteId를 조회하여 주입
  */
-function buildGatewayOfflineFault(lifecycle) {
+async function buildGatewayOfflineFault(lifecycle) {
   const deviceId = lifecycle.clientId; // thing name = clientId
   const now = new Date().toISOString();
+
+  // devices 테이블에서 siteId 조회
+  let siteId = 'UNKNOWN';
+  const device = await getDevice(deviceId);
+  if (device && device.siteId) {
+    siteId = device.siteId;
+  } else {
+    console.warn(`buildGatewayOfflineFault: device ${deviceId} not found in devices table, using UNKNOWN`);
+  }
+
   return {
     eventId: `EVT-${now.slice(0, 10).replace(/-/g, '')}-GW-${deviceId}-${Date.now()}`,
-    siteId: lifecycle.siteId || 'UNKNOWN',
+    siteId,
     deviceId,
     eventType: 'GATEWAY_OFFLINE',
     severity: 'FAULT',
