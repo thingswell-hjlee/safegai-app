@@ -61,6 +61,15 @@ export class SafegaiStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    // ─── DynamoDB: users 테이블 (푸시 토큰) ───────────────────────────
+    const usersTable = new dynamodb.Table(this, 'UsersTable', {
+      tableName: 'users',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     // ─── Cognito UserPool ─────────────────────────────────────────────
     const userPool = new cognito.UserPool(this, 'SafegaiUserPool', {
       userPoolName: 'safegai-users',
@@ -105,31 +114,34 @@ export class SafegaiStack extends cdk.Stack {
     const fnIngest = new lambda.Function(this, 'FnIngest', {
       functionName: 'safegai-fnIngest',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda', 'fnIngest')),
+      handler: 'fnIngest/index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda')),
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {
         EVENTS_TABLE: eventsTable.tableName,
         DEVICES_TABLE: devicesTable.tableName,
+        USERS_TABLE: usersTable.tableName,
         FCM_SECRET_ARN: fcmSecret.secretArn,
       },
     });
 
     eventsTable.grantReadWriteData(fnIngest);
     devicesTable.grantReadWriteData(fnIngest);
+    usersTable.grantReadData(fnIngest);
     fcmSecret.grantRead(fnIngest);
 
     // ─── Lambda: fnEscalate ───────────────────────────────────────────
     const fnEscalate = new lambda.Function(this, 'FnEscalate', {
       functionName: 'safegai-fnEscalate',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda', 'fnEscalate')),
+      handler: 'fnEscalate/index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda')),
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {
         EVENTS_TABLE: eventsTable.tableName,
+        USERS_TABLE: usersTable.tableName,
         FCM_SECRET_ARN: fcmSecret.secretArn,
         ESC1_MINUTES: '1',
         ESC2_MINUTES: '3',
@@ -138,19 +150,21 @@ export class SafegaiStack extends cdk.Stack {
     });
 
     eventsTable.grantReadWriteData(fnEscalate);
+    usersTable.grantReadData(fnEscalate);
     fcmSecret.grantRead(fnEscalate);
 
     // ─── Lambda: fnApi ────────────────────────────────────────────────
     const fnApi = new lambda.Function(this, 'FnApi', {
       functionName: 'safegai-fnApi',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda', 'fnApi')),
+      handler: 'fnApi/index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '..', 'lambda')),
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {
         EVENTS_TABLE: eventsTable.tableName,
         DEVICES_TABLE: devicesTable.tableName,
+        USERS_TABLE: usersTable.tableName,
         FCM_SECRET_ARN: fcmSecret.secretArn,
         USER_POOL_ID: userPool.userPoolId,
       },
@@ -158,11 +172,34 @@ export class SafegaiStack extends cdk.Stack {
 
     eventsTable.grantReadWriteData(fnApi);
     devicesTable.grantReadWriteData(fnApi);
+    usersTable.grantReadWriteData(fnApi);
     fcmSecret.grantRead(fnApi);
 
     // ─── IoT Core: Thing gw-01 ───────────────────────────────────────
     const iotThing = new iot.CfnThing(this, 'ThingGw01', {
       thingName: 'gw-01',
+    });
+
+    // ─── IoT 인증서 프로비저닝 ─────────────────────────────────────
+    // 인증서 ARN은 배포 전 CLI로 생성 후 파라미터로 주입:
+    //   aws iot create-keys-and-certificate --set-as-active \
+    //     --certificate-pem-outfile cert.pem --private-key-outfile key.pem
+    const iotCertArn = new cdk.CfnParameter(this, 'IotCertificateArn', {
+      type: 'String',
+      description: 'IoT Thing gw-01에 연결할 인증서 ARN (aws iot create-keys-and-certificate로 생성)',
+      default: '',
+    });
+
+    // 인증서 → 정책 연결
+    const certPolicyAttach = new iot.CfnPolicyPrincipalAttachment(this, 'CertPolicyAttach', {
+      policyName: 'safegai-gw-policy',
+      principal: iotCertArn.valueAsString,
+    });
+
+    // 인증서 → Thing 연결
+    const certThingAttach = new iot.CfnThingPrincipalAttachment(this, 'CertThingAttach', {
+      thingName: 'gw-01',
+      principal: iotCertArn.valueAsString,
     });
 
     // IoT 정책: 발행 safegai/* 만 허용 (최소 권한)
