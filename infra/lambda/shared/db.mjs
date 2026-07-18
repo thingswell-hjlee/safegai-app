@@ -191,6 +191,10 @@ export async function queryEventsBySite(siteId, { limit = 20, cursor, status, se
 
 /**
  * 이벤트 상태 전이 (역행 금지)
+ *
+ * updateFields의 키(예: 'ack.by', 'resolve.at')는 '.'로 분해해
+ * 세그먼트마다 ExpressionAttributeNames 별칭을 부여하여
+ * DynamoDB 예약어(by, status 등) 충돌을 방지한다.
  */
 const STATUS_ORDER = { OPEN: 0, ACKED: 1, IN_PROGRESS: 2, RESOLVED: 3 };
 
@@ -207,23 +211,35 @@ export async function transitionEventStatus(eventId, newStatus, updateFields) {
     throw { code: 'STATE_CONFLICT', message: 'Cannot transition to this status' };
   }
 
-  let updateParts = ['#st = :newStatus', 'gsiOpen = :gsiOpen'];
-  let exprValues = {
-    ':newStatus': newStatus,
-    ':gsiOpen': newStatus === 'RESOLVED' ? `__RESOLVED__` : undefined,
-    ...Object.entries(updateFields || {}).reduce((acc, [k, v], i) => {
-      updateParts.push(`${k} = :uf${i}`);
-      acc[`:uf${i}`] = v;
-      return acc;
-    }, {}),
-  };
+  // ExpressionAttributeNames 누적 (#st는 status 예약어 회피용으로 항상 포함)
+  const exprNames = { '#st': 'status' };
+  const exprValues = { ':newStatus': newStatus };
+  const updateParts = ['#st = :newStatus'];
 
-  // gsiOpen 업데이트: RESOLVED이면 GSI2에서 제거 (gsiOpen을 null이 아닌 dummy로 설정)
-  if (newStatus !== 'RESOLVED') {
-    delete exprValues[':gsiOpen'];
-    updateParts = updateParts.filter(p => p !== 'gsiOpen = :gsiOpen');
+  // gsiOpen 업데이트: RESOLVED이면 GSI2에서 제거
+  if (newStatus === 'RESOLVED') {
+    updateParts.push('gsiOpen = :gsiOpen');
+    exprValues[':gsiOpen'] = '__RESOLVED__';
   }
 
+  // updateFields 처리: 키를 '.'로 분해해 세그먼트별 별칭 부여
+  // 예) 'ack.by' → '#f0_0.#f0_1', names에 {'#f0_0':'ack','#f0_1':'by'}
+  if (updateFields) {
+    Object.entries(updateFields).forEach(([key, value], fieldIdx) => {
+      const segments = key.split('.');
+      const aliasedSegments = segments.map((seg, segIdx) => {
+        const alias = `#f${fieldIdx}_${segIdx}`;
+        exprNames[alias] = seg;
+        return alias;
+      });
+      const aliasedPath = aliasedSegments.join('.');
+      const valueAlias = `:uf${fieldIdx}`;
+      updateParts.push(`${aliasedPath} = ${valueAlias}`);
+      exprValues[valueAlias] = value;
+    });
+  }
+
+  // 조건식: 현재 status가 allowedPrev 중 하나여야 함
   const conditionValues = allowedPrev.reduce((acc, s, i) => {
     acc[`:prev${i}`] = s;
     return acc;
@@ -231,13 +247,19 @@ export async function transitionEventStatus(eventId, newStatus, updateFields) {
 
   const conditionExpr = `#st IN (${allowedPrev.map((_, i) => `:prev${i}`).join(',')})`;
 
+  const updateExpression = 'SET ' + updateParts.join(', ');
+
+  // 디버그 로그: UpdateExpression/Names에 예약어 raw 사용이 없는지 확인용
+  console.log('[transitionEventStatus] UpdateExpression:', updateExpression);
+  console.log('[transitionEventStatus] ExpressionAttributeNames:', JSON.stringify(exprNames));
+
   try {
     await ddb.send(new UpdateCommand({
       TableName: EVENTS_TABLE,
       Key: { eventId },
-      UpdateExpression: 'SET ' + updateParts.join(', '),
+      UpdateExpression: updateExpression,
       ConditionExpression: conditionExpr,
-      ExpressionAttributeNames: { '#st': 'status' },
+      ExpressionAttributeNames: exprNames,
       ExpressionAttributeValues: { ...exprValues, ...conditionValues },
     }));
     return { success: true };
