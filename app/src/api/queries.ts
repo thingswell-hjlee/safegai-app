@@ -30,6 +30,7 @@ export function useEventsQuery(params?: {
       return res.data.data!;
     },
     staleTime: STALE_TIME_DEFAULT,
+    refetchInterval: STALE_TIME_DEFAULT, // 30초 자동갱신
   });
 }
 
@@ -59,5 +60,6 @@ export function useSiteStateQuery() {
       return res.data.data!;
     },
     staleTime: STALE_TIME_DEFAULT,
+    refetchInterval: STALE_TIME_DEFAULT, // 30초 자동갱신
   });
 }

@@ -1,8 +1,8 @@
 /**
  * eventStore — Zustand (§6.3)
  *
- * 이벤트 목록/상세 상태 관리 뼈대.
- * 낙관적 갱신·실패 롤백은 다음 모듈(M5 ActionStepper)에서 구현.
+ * 이벤트 목록/상세 상태 관리.
+ * 낙관적 갱신 + 실패 롤백.
  */
 import { create } from 'zustand';
 
@@ -19,6 +19,7 @@ export interface SafegaiEvent {
   currentValue: number | null;
   unit: string;
   status: 'OPEN' | 'ACKED' | 'IN_PROGRESS' | 'RESOLVED';
+  assignee?: { userId: string | null; at: string | null };
 }
 
 export interface EventState {
@@ -26,11 +27,43 @@ export interface EventState {
   selectedEvent: SafegaiEvent | null;
   setEvents: (events: SafegaiEvent[]) => void;
   setSelectedEvent: (event: SafegaiEvent | null) => void;
+  /** 낙관적 갱신: 이벤트 상태를 즉시 변경 (UI 반응성) */
+  optimisticUpdateStatus: (eventId: string, newStatus: SafegaiEvent['status']) => SafegaiEvent | null;
+  /** 실패 롤백: 이전 이벤트 상태로 복원 */
+  rollbackEvent: (event: SafegaiEvent) => void;
 }
 
-export const useEventStore = create<EventState>((set) => ({
+export const useEventStore = create<EventState>((set, get) => ({
   events: [],
   selectedEvent: null,
   setEvents: (events) => set({ events }),
   setSelectedEvent: (event) => set({ selectedEvent: event }),
+
+  optimisticUpdateStatus: (eventId, newStatus) => {
+    const { events, selectedEvent } = get();
+    const prev = events.find((e) => e.eventId === eventId) || selectedEvent;
+    if (!prev) return null;
+
+    // 목록 갱신
+    set({
+      events: events.map((e) =>
+        e.eventId === eventId ? { ...e, status: newStatus } : e,
+      ),
+      selectedEvent:
+        selectedEvent?.eventId === eventId
+          ? { ...selectedEvent, status: newStatus }
+          : selectedEvent,
+    });
+
+    return prev; // 롤백용 원본 반환
+  },
+
+  rollbackEvent: (event) => {
+    const { events, selectedEvent } = get();
+    set({
+      events: events.map((e) => (e.eventId === event.eventId ? event : e)),
+      selectedEvent:
+        selectedEvent?.eventId === event.eventId ? event : selectedEvent,
+    });
+  },
 }));
