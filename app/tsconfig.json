@@ -19,6 +19,6 @@
     },
     "types": ["react-native"]
   },
-  "include": ["src/**/*", "index.ts", "App.tsx"],
-  "exclude": ["node_modules"]
+  "include": ["src/**/*", "App.tsx"],
+  "exclude": ["node_modules", "android", "ios"]
 }
