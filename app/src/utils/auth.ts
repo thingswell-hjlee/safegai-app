@@ -1,13 +1,11 @@
 /**
- * 인증 헬퍼 — Amplify Auth 래핑 + Keychain 연동 (§6.1)
+ * 인증 헬퍼 — Amplify Auth 래핑 (§6.1)
  *
- * - signIn: 이메일+비밀번호 로그인 → 토큰 Keychain 저장 → 역할 추출
- * - refreshSession: refreshToken으로 idToken 갱신
- * - signOut: 토큰 폐기 + Keychain 삭제
- * - getRole: cognito:groups에서 최고 역할 판정
+ * 토큰 보관은 Amplify가 secureKVStorage(Keychain/Keystore)를 통해 직접 관리.
+ * 이 모듈은 signIn/signOut/restoreSession/refreshIdToken + 역할 추출만 담당.
  */
 import { signIn as amplifySignIn, signOut as amplifySignOut, fetchAuthSession } from 'aws-amplify/auth';
-import { saveTokens, clearTokens, loadTokens } from './secureStorage';
+import { secureKVStorage } from './secureStorage';
 
 export type UserRole = 'admin' | 'teacher' | 'operator' | 'maintainer';
 
@@ -20,32 +18,27 @@ const ROLE_PRIORITY: Record<UserRole, number> = {
 
 export interface AuthResult {
   idToken: string;
-  refreshToken: string;
   role: UserRole;
   email: string;
   userId: string;
 }
 
 /**
- * 이메일+비밀번호 로그인 → Keychain 저장
+ * 이메일+비밀번호 로그인
+ * Amplify가 토큰을 secureKVStorage(Keychain)에 자동 저장.
  */
 export async function signIn(email: string, password: string): Promise<AuthResult> {
   await amplifySignIn({ username: email, password });
 
   const session = await fetchAuthSession({ forceRefresh: true });
   const idToken = session.tokens?.idToken?.toString() ?? '';
-  const refreshToken = ''; // Amplify v6 manages refresh internally
 
-  // Keychain 보관
-  await saveTokens({ idToken, refreshToken });
-
-  // 역할 추출
   const payload = session.tokens?.idToken?.payload;
   const role = extractRole(payload);
   const userId = (payload?.sub as string) ?? '';
   const userEmail = (payload?.email as string) ?? email;
 
-  return { idToken, refreshToken, role, email: userEmail, userId };
+  return { idToken, role, email: userEmail, userId };
 }
 
 /**
@@ -62,10 +55,10 @@ export async function restoreSession(): Promise<AuthResult | null> {
     const userId = (payload?.sub as string) ?? '';
     const email = (payload?.email as string) ?? '';
 
-    await saveTokens({ idToken, refreshToken: '' });
-    return { idToken, refreshToken: '', role, email, userId };
+    return { idToken, role, email, userId };
   } catch {
-    await clearTokens();
+    // 세션 만료 또는 오류 — 보안 저장소 클리어
+    await secureKVStorage.clear();
     return null;
   }
 }
@@ -76,33 +69,31 @@ export async function restoreSession(): Promise<AuthResult | null> {
 export async function refreshIdToken(): Promise<string | null> {
   try {
     const session = await fetchAuthSession({ forceRefresh: true });
-    const idToken = session.tokens?.idToken?.toString() ?? null;
-    if (idToken) {
-      await saveTokens({ idToken, refreshToken: '' });
-    }
-    return idToken;
+    return session.tokens?.idToken?.toString() ?? null;
   } catch {
     return null;
   }
 }
 
 /**
- * 로그아웃 — 토큰 폐기 + Keychain 삭제
+ * 로그아웃 — Amplify signOut + 보안 저장소 클리어
  */
 export async function signOut(): Promise<void> {
   try {
     await amplifySignOut();
   } catch {
-    // 무시 — Keychain은 반드시 삭제
+    // 무시 — 보안 저장소는 반드시 클리어
   }
-  await clearTokens();
+  await secureKVStorage.clear();
 }
 
 /**
  * cognito:groups → 최고 역할 판정
+ * 무그룹 사용자에게는 최소 권한(maintainer)을 부여하여
+ * 상위 UI(admin/teacher 기능)가 노출되지 않도록 한다.
  */
 function extractRole(payload: Record<string, unknown> | undefined): UserRole {
-  if (!payload) return 'operator';
+  if (!payload) return 'maintainer';
 
   const groups = payload['cognito:groups'];
   let roleList: string[] = [];
@@ -114,7 +105,7 @@ function extractRole(payload: Record<string, unknown> | undefined): UserRole {
   }
 
   const validRoles = roleList.filter((r): r is UserRole => r in ROLE_PRIORITY);
-  if (validRoles.length === 0) return 'operator';
+  if (validRoles.length === 0) return 'maintainer';
 
   validRoles.sort((a, b) => ROLE_PRIORITY[b] - ROLE_PRIORITY[a]);
   return validRoles[0];
