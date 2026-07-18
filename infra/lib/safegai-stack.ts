@@ -180,7 +180,7 @@ export class SafegaiStack extends cdk.Stack {
       thingName: 'gw-01',
     });
 
-    // ─── IoT 인증서 프로비저닝 ─────────────────────────────────────
+    // ─── IoT 인증서 프로비저닝 (조건부) ──────────────────────────────
     // 인증서 ARN은 배포 전 CLI로 생성 후 파라미터로 주입:
     //   aws iot create-keys-and-certificate --set-as-active \
     //     --certificate-pem-outfile cert.pem --private-key-outfile key.pem
@@ -190,16 +190,11 @@ export class SafegaiStack extends cdk.Stack {
       default: '',
     });
 
-    // 인증서 → 정책 연결
-    const certPolicyAttach = new iot.CfnPolicyPrincipalAttachment(this, 'CertPolicyAttach', {
-      policyName: 'safegai-gw-policy',
-      principal: iotCertArn.valueAsString,
-    });
-
-    // 인증서 → Thing 연결
-    const certThingAttach = new iot.CfnThingPrincipalAttachment(this, 'CertThingAttach', {
-      thingName: 'gw-01',
-      principal: iotCertArn.valueAsString,
+    // CfnCondition: 인증서 ARN이 빈 문자열이 아닐 때만 attachment 생성
+    const hasIotCert = new cdk.CfnCondition(this, 'HasIotCert', {
+      expression: cdk.Fn.conditionNot(
+        cdk.Fn.conditionEquals(iotCertArn.valueAsString, ''),
+      ),
     });
 
     // IoT 정책: 발행 safegai/* 만 허용 (최소 권한)
@@ -237,6 +232,22 @@ export class SafegaiStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('iot.amazonaws.com'),
     });
     fnIngest.grantInvoke(iotRuleRole);
+
+    // ─── IoT 인증서 → 정책·Thing 연결 (조건부) ───────────────────────
+    // 인증서 ARN이 제공된 경우에만 attachment 생성
+    const certPolicyAttach = new iot.CfnPolicyPrincipalAttachment(this, 'CertPolicyAttach', {
+      policyName: 'safegai-gw-policy',
+      principal: iotCertArn.valueAsString,
+    });
+    certPolicyAttach.cfnOptions.condition = hasIotCert;
+    certPolicyAttach.addDependency(iotPolicy);
+
+    const certThingAttach = new iot.CfnThingPrincipalAttachment(this, 'CertThingAttach', {
+      thingName: 'gw-01',
+      principal: iotCertArn.valueAsString,
+    });
+    certThingAttach.cfnOptions.condition = hasIotCert;
+    certThingAttach.addDependency(iotThing);
 
     new iot.CfnTopicRule(this, 'RuleEvents', {
       ruleName: 'r_events',
