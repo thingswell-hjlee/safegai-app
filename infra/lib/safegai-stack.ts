@@ -211,7 +211,7 @@ export class SafegaiStack extends cdk.Stack {
           },
           {
             Effect: 'Allow',
-            Action: ['iot:Publish'],
+            Action: ['iot:Publish', 'iot:RetainPublish'],
             Resource: [`arn:aws:iot:ap-northeast-2:050649355977:topic/safegai/*`],
           },
           {
