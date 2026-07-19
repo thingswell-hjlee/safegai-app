@@ -211,7 +211,7 @@ export class SafegaiStack extends cdk.Stack {
           },
           {
             Effect: 'Allow',
-            Action: ['iot:Publish'],
+            Action: ['iot:Publish', 'iot:RetainPublish'],
             Resource: [`arn:aws:iot:ap-northeast-2:050649355977:topic/safegai/*`],
           },
           {
@@ -292,6 +292,28 @@ export class SafegaiStack extends cdk.Stack {
     fnIngest.addPermission('AllowIotPresenceInvoke', {
       principal: new iam.ServicePrincipal('iot.amazonaws.com'),
       sourceArn: `arn:aws:iot:ap-northeast-2:050649355977:rule/r_presence`,
+    });
+
+    // IoT Rule: r_status — 게이트웨이 status 수신 → fnIngest (devices online 갱신)
+    new iot.CfnTopicRule(this, 'RuleStatus', {
+      ruleName: 'r_status',
+      topicRulePayload: {
+        sql: "SELECT *, topic(2) as siteId, topic(4) as gwId FROM 'safegai/+/gw/+/status'",
+        awsIotSqlVersion: '2016-03-23',
+        ruleDisabled: false,
+        actions: [
+          {
+            lambda: {
+              functionArn: fnIngest.functionArn,
+            },
+          },
+        ],
+      },
+    });
+
+    fnIngest.addPermission('AllowIotStatusInvoke', {
+      principal: new iam.ServicePrincipal('iot.amazonaws.com'),
+      sourceArn: `arn:aws:iot:ap-northeast-2:050649355977:rule/r_status`,
     });
 
     // ─── EventBridge Scheduler: 1분 rate → fnEscalate ─────────────────
