@@ -2,8 +2,8 @@
  * M1 홈 — StatusBanner + GET /events?limit=5 + GET /site/state (30초 자동갱신, 포그라운드만)
  * '현장 지연' = site/state의 gw online:false.
  */
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, AppState } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useAuthStore } from '../stores/authStore';
 import { useEventsQuery, useSiteStateQuery } from '../api/queries';
 import { SafegaiEvent } from '../stores/eventStore';
@@ -20,14 +20,16 @@ interface Props {
 
 export function HomeScreen({ navigation }: Props) {
   const { email, role, logout } = useAuthStore();
-  const [lastUpdated] = useState(new Date());
 
   const eventsQ = useEventsQuery({ limit: 5, siteId: 'MAPO-01' });
   const siteQ = useSiteStateQuery();
 
-  // 30초 자동갱신 (포그라운드만) — react-query refetchInterval
-  // Handled via refetchInterval in query options below
-  const eventsQWithInterval = useEventsQuery({ limit: 5, siteId: 'MAPO-01' });
+  // dataUpdatedAt(마지막 성공 fetch ms)으로 FreshnessLabel 계산
+  const lastUpdated = useMemo(() => {
+    const timestamps = [eventsQ.dataUpdatedAt, siteQ.dataUpdatedAt].filter((t) => t > 0);
+    if (timestamps.length === 0) return null;
+    return new Date(Math.max(...timestamps));
+  }, [eventsQ.dataUpdatedAt, siteQ.dataUpdatedAt]);
 
   const openCount = siteQ.data?.openCount ?? 0;
   const gwOffline = siteQ.data?.devices?.some((d) => !d.online) ?? false;
