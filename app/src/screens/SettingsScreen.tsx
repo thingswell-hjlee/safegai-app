@@ -5,10 +5,11 @@
  * - 시험 발송 버튼: POST /push/test → 결과 토스트
  * - INFO 알림 끔 토글 (DANGER는 항상 켜짐)
  */
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Switch, Alert, StyleSheet } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Switch, Alert, StyleSheet, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
+import { useFocusEffect } from '@react-navigation/native';
 import { apiClient } from '../api/client';
 import { pushStore } from '../stores/pushStore';
 import { colors, typography, spacing, radius, touchTarget } from '../theme/tokens';
@@ -22,9 +23,18 @@ export function SettingsScreen({ navigation }: Props) {
   const [testLoading, setTestLoading] = useState(false);
   const lastPushAt = pushStore((s) => s.lastPushAt);
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
+  // 화면 포커스 시마다 권한·토큰 상태 재확인 (설정 변경 후 복귀 대응)
+  useFocusEffect(
+    useCallback(() => {
+      checkStatus();
+
+      // AppState 'active' 복귀 시에도 재확인 (백그라운드→포그라운드)
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') checkStatus();
+      });
+      return () => sub.remove();
+    }, []),
+  );
 
   async function checkStatus() {
     // 권한 확인
