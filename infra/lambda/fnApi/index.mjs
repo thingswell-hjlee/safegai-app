@@ -244,7 +244,10 @@ async function handleRegisterToken(event, userInfo) {
     return respond(400, { code: 'INVALID', msg: 'token이 필요합니다.' });
   }
 
-  await registerPushToken(userInfo.userId, body.token, body.device || 'unknown');
+  const role = userInfo.primaryRole;
+  const siteId = body.siteId || process.env.DEFAULT_SITE_ID || 'MAPO-01';
+
+  await registerPushToken(userInfo.userId, body.token, body.device || 'unknown', role, siteId);
   return respond(200, null, { registered: true });
 }
 

@@ -305,14 +305,18 @@ export async function getUser(userId) {
 }
 
 /**
- * users 테이블: FCM 토큰 등록
+ * users 테이블: FCM 토큰 등록 + role·siteIds 설정
+ * getUsersBySite가 대상자를 찾으려면 role·siteIds가 반드시 필요.
  */
-export async function registerPushToken(userId, token, deviceInfo) {
+export async function registerPushToken(userId, token, deviceInfo, role, siteId) {
   await ddb.send(new UpdateCommand({
     TableName: USERS_TABLE,
     Key: { userId },
-    UpdateExpression: 'SET fcmTokens = list_append(if_not_exists(fcmTokens, :empty), :tok)',
+    UpdateExpression: 'SET #role = :role, siteIds = :siteIds, fcmTokens = list_append(if_not_exists(fcmTokens, :empty), :tok)',
+    ExpressionAttributeNames: { '#role': 'role' },
     ExpressionAttributeValues: {
+      ':role': role,
+      ':siteIds': [siteId],
       ':tok': [{ token, device: deviceInfo, registeredAt: new Date().toISOString() }],
       ':empty': [],
     },
