@@ -167,6 +167,7 @@ export class SafegaiStack extends cdk.Stack {
         USERS_TABLE: usersTable.tableName,
         FCM_SECRET_ARN: fcmSecret.secretArn,
         USER_POOL_ID: userPool.userPoolId,
+        DEFAULT_SITE_ID: 'MAPO-01',
       },
     });
 
