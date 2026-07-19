@@ -32,7 +32,12 @@ export function HomeScreen({ navigation }: Props) {
   }, [eventsQ.dataUpdatedAt, siteQ.dataUpdatedAt]);
 
   const openCount = siteQ.data?.openCount ?? 0;
-  const gwOffline = siteQ.data?.devices?.some((d) => !d.online) ?? false;
+  const gwOffline = (() => {
+    const devices = siteQ.data?.devices ?? [];
+    const gateways = devices.filter((d) => d.deviceId.startsWith('gw'));
+    if (gateways.length === 0) return true; // 하트비트 미수신 → 연결 지연 간주
+    return gateways.some((d) => !d.online);
+  })();
 
   const navigateToList = () => navigation.navigate('EventList');
   const navigateToDetail = (eventId: string) =>
