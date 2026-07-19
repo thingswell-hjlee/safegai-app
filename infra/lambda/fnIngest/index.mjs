@@ -34,6 +34,13 @@ export const handler = async (event) => {
   let evt;
 
   try {
+    // ─── 게이트웨이 status 메시지 분기 ─────────────────────────────
+    // 판별: gwId 존재 + online 필드 존재 + eventId 없음
+    if (isStatusMessage(event)) {
+      await handleGatewayStatus(event);
+      return { statusCode: 200, body: 'status-updated' };
+    }
+
     // ─── 생명주기 이벤트 감지 ──────────────────────────────────────
     if (isLifecycleEvent(event)) {
       evt = await buildGatewayOfflineFault(event);
@@ -95,6 +102,32 @@ export const handler = async (event) => {
     throw err;
   }
 };
+
+/**
+ * 게이트웨이 status 메시지 판별
+ * IoT Rule r_status: SELECT *, topic(2) as siteId, topic(4) as gwId FROM 'safegai/+/gw/+/status'
+ */
+function isStatusMessage(event) {
+  return event.gwId && (event.online !== undefined) && !event.eventId;
+}
+
+/**
+ * 게이트웨이 status 처리 — devices 테이블 upsert (이벤트 저장·푸시 없음)
+ */
+async function handleGatewayStatus(event) {
+  const deviceId = event.gwId;
+  const siteId = event.siteId || 'UNKNOWN';
+  const online = Boolean(event.online);
+  const statusSummary = {
+    online,
+    ts: event.ts || new Date().toISOString(),
+    uptimeSec: event.uptimeSec ?? null,
+    bufferCount: event.bufferCount ?? null,
+  };
+
+  await upsertDevice(deviceId, siteId, online, statusSummary);
+  console.log(`GW status: ${deviceId} online=${online} site=${siteId}`);
+}
 
 /**
  * IoT 생명주기 이벤트 감지
