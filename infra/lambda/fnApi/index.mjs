@@ -273,19 +273,22 @@ async function handleTestPush(userInfo) {
     return respond(400, { code: 'INVALID', msg: '등록된 푸시 토큰이 없습니다.' });
   }
 
-  // 첫 번째 토큰으로 테스트 전송
-  const token = user.fcmTokens[0].token;
-  const result = await sendFcmMessage(token, {
-    eventId: 'TEST',
-    siteId: 'TEST',
-    severity: 'INFO',
-    type: 'EVENT',
-    title: '푸시 테스트',
-    body: '푸시 알림이 정상적으로 수신됩니다.',
-    occurredAt: new Date().toISOString(),
-  });
+  // 등록된 모든 토큰으로 테스트 전송 (하나라도 성공하면 sent=true)
+  let anySuccess = false;
+  for (const entry of user.fcmTokens) {
+    const result = await sendFcmMessage(entry.token, {
+      eventId: 'TEST',
+      siteId: 'TEST',
+      severity: 'INFO',
+      type: 'EVENT',
+      title: '푸시 테스트',
+      body: '푸시 알림이 정상적으로 수신됩니다.',
+      occurredAt: new Date().toISOString(),
+    });
+    if (result.success) anySuccess = true;
+  }
 
-  return respond(200, null, { sent: result.success });
+  return respond(200, null, { sent: anySuccess });
 }
 
 // ════════════════════════════════════════════════════════════════════════

@@ -135,7 +135,8 @@ export async function sendFcmMessage(token, { eventId, siteId, severity, type, t
       android: {
         notification: {
           channelId: getAndroidChannel(severity),
-          priority: severity === 'DANGER' ? 'high' : 'default',
+          // FCM v1은 notification.priority가 아니라 notificationPriority(enum)
+          notificationPriority: severity === 'DANGER' ? 'PRIORITY_HIGH' : 'PRIORITY_DEFAULT',
         },
         priority: severity === 'DANGER' ? 'high' : 'normal',
       },

@@ -55,10 +55,10 @@ export function SettingsScreen({ navigation }: Props) {
     setTestLoading(true);
     try {
       const res = await apiClient.post('/push/test');
-      if (res.data?.ok) {
+      if (res.data?.ok && res.data?.data?.sent) {
         Alert.alert('성공', '테스트 푸시가 발송되었습니다.');
       } else {
-        Alert.alert('실패', '테스트 푸시 발송에 실패했습니다.');
+        Alert.alert('실패', 'FCM 전송에 실패했습니다. 서버 로그를 확인하세요.');
       }
     } catch {
       Alert.alert('실패', '테스트 푸시 발송에 실패했습니다.');
