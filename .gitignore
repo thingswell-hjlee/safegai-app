@@ -1,0 +1,4 @@
+
+# release 서명 (비밀 — 커밋 금지)
+app/android/keystore.properties
+*.keystore
