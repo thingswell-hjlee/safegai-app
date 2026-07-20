@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { navigationRef } from './src/navigation/navigationRef';
 import { initAmplify } from './src/utils/amplify';
 import { useAuthStore } from './src/stores/authStore';
 import { setupNotificationChannels, subscribeTokenRefresh } from './src/push';
@@ -31,7 +32,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <RootNavigator />
       </NavigationContainer>
     </QueryClientProvider>

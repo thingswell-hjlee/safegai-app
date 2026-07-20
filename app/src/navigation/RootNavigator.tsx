@@ -1,10 +1,10 @@
 /**
  * RootNavigator — 인증 상태 기반 분기 + M1/M3/M4/M5/M8 + 딥링크 + 인앱배너
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useNavigation, NavigationContainerRef } from '@react-navigation/native';
+import { navigateTo } from './navigationRef';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { pushStore } from '../stores/pushStore';
@@ -27,7 +27,6 @@ const Stack = createNativeStackNavigator();
 export function RootNavigator() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const queryClient = useQueryClient();
-  const navigationRef = useRef<any>(null);
 
   // 딥링크 + 포그라운드 메시지 리스너
   useEffect(() => {
@@ -38,7 +37,7 @@ export function RootNavigator() {
 
     // 백그라운드 알림 탭 → M4 이동
     const unsubOpened = subscribeNotificationOpened((eventId) => {
-      navigationRef.current?.navigate('EventDetail', { eventId });
+      navigateTo('EventDetail', { eventId });
     });
 
     // 종료 상태에서 알림 탭으로 앱 열림
@@ -46,7 +45,7 @@ export function RootNavigator() {
       if (eventId) {
         // 약간의 지연으로 네비게이션 준비 대기
         setTimeout(() => {
-          navigationRef.current?.navigate('EventDetail', { eventId });
+          navigateTo('EventDetail', { eventId });
         }, 500);
       }
     });
@@ -55,7 +54,7 @@ export function RootNavigator() {
     const pendingId = pushStore.getState().consumePendingDeepLink();
     if (pendingId) {
       setTimeout(() => {
-        navigationRef.current?.navigate('EventDetail', { eventId: pendingId });
+        navigateTo('EventDetail', { eventId: pendingId });
       }, 500);
     }
 
@@ -74,11 +73,11 @@ export function RootNavigator() {
   }
 
   const handleBannerPress = (eventId: string) => {
-    navigationRef.current?.navigate('EventDetail', { eventId });
+    navigateTo('EventDetail', { eventId });
   };
 
   return (
-    <View style={{ flex: 1 }} ref={navigationRef}>
+    <View style={{ flex: 1 }}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <>
