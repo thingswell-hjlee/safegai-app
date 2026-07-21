@@ -18,6 +18,7 @@ import {
 } from '../shared/db.mjs';
 import { getPushTargetRoles } from '../shared/auth.mjs';
 import { sendFcmToUsers } from '../shared/fcm.mjs';
+import { sendAlertEmail } from '../shared/email.mjs';
 
 // 필수 필드 (event-contract §1)
 const REQUIRED_FIELDS = ['eventId', 'siteId', 'deviceId', 'eventType', 'severity', 'title', 'occurredAt'];
@@ -244,6 +245,14 @@ async function handlePush(evt) {
   });
 
   console.log(`Push sent: ${evt.eventId} → ${users.length} users`);
+
+  // 위험(DANGER)은 이메일도 병행 발송 (push-policy 보조 채널 — 실패해도 푸시에 영향 없음)
+  if (severity === 'DANGER') {
+    await sendAlertEmail({
+      severity, title: evt.title, body: evt.message,
+      siteId: evt.siteId, eventId: evt.eventId, occurredAt: evt.occurredAt,
+    });
+  }
 }
 
 /**

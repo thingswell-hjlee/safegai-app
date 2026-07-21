@@ -14,6 +14,7 @@ import { EventListScreen } from '../screens/EventListScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { ActionProcessScreen } from '../screens/ActionProcessScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { AccountManagementScreen } from '../screens/AccountManagementScreen';
 import { InAppBanner } from '../components/InAppBanner';
 import {
   subscribeForegroundMessages,
@@ -86,6 +87,7 @@ export function RootNavigator() {
             <Stack.Screen name="EventDetail" component={EventDetailScreen} />
             <Stack.Screen name="ActionProcess" component={ActionProcessScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="AccountManagement" component={AccountManagementScreen} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />

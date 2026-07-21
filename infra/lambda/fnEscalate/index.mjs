@@ -11,6 +11,7 @@
  */
 import { scanOpenDangerEvents, markEscalation, getUsersBySite } from '../shared/db.mjs';
 import { sendFcmToUsers } from '../shared/fcm.mjs';
+import { sendAlertEmail } from '../shared/email.mjs';
 
 // 환경변수로 시간 조정 가능
 const ESC1_MS = (parseInt(process.env.ESC1_MINUTES) || 1) * 60 * 1000;
@@ -105,6 +106,13 @@ async function escalateLevel2(evt) {
   });
 
   console.log(`esc2: ${evt.eventId} → ${users.length} admins`);
+
+  // 3분 미확인 → 관리자 이메일 병행 통보
+  await sendAlertEmail({
+    severity: evt.severity, prefix: '[긴급 에스컬레이션] ',
+    title: evt.title, body: '3분 이상 미확인 위험입니다. 관리자 확인이 필요합니다.',
+    siteId: evt.siteId, eventId: evt.eventId, occurredAt: evt.occurredAt,
+  });
 }
 
 /**
@@ -129,4 +137,11 @@ async function escalateLevel3(evt) {
   });
 
   console.log(`esc3: ${evt.eventId} → ${users.length} admin+teachers`);
+
+  // 5분 미확인 최종 → 이메일 병행 통보
+  await sendAlertEmail({
+    severity: evt.severity, prefix: '[최종 에스컬레이션] ',
+    title: evt.title, body: '5분 이상 미확인 위험! 모든 관리자에게 통보되었습니다.',
+    siteId: evt.siteId, eventId: evt.eventId, occurredAt: evt.occurredAt,
+  });
 }

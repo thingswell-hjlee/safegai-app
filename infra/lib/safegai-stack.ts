@@ -123,6 +123,8 @@ export class SafegaiStack extends cdk.Stack {
         DEVICES_TABLE: devicesTable.tableName,
         USERS_TABLE: usersTable.tableName,
         FCM_SECRET_ARN: fcmSecret.secretArn,
+        ALERT_EMAIL_FROM: 'hjlee@thingswell.co.kr',
+        ALERT_EMAIL_TO: 'hjlee@thingswell.co.kr',
       },
     });
 
@@ -130,6 +132,10 @@ export class SafegaiStack extends cdk.Stack {
     devicesTable.grantReadWriteData(fnIngest);
     usersTable.grantReadData(fnIngest);
     fcmSecret.grantRead(fnIngest);
+    fnIngest.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ses:SendEmail'],
+      resources: ['*'],
+    }));
 
     // ─── Lambda: fnEscalate ───────────────────────────────────────────
     const fnEscalate = new lambda.Function(this, 'FnEscalate', {
@@ -146,12 +152,18 @@ export class SafegaiStack extends cdk.Stack {
         ESC1_MINUTES: '1',
         ESC2_MINUTES: '3',
         ESC3_MINUTES: '5',
+        ALERT_EMAIL_FROM: 'hjlee@thingswell.co.kr',
+        ALERT_EMAIL_TO: 'hjlee@thingswell.co.kr',
       },
     });
 
     eventsTable.grantReadWriteData(fnEscalate);
     usersTable.grantReadData(fnEscalate);
     fcmSecret.grantRead(fnEscalate);
+    fnEscalate.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ses:SendEmail'],
+      resources: ['*'],
+    }));
 
     // ─── Lambda: fnApi ────────────────────────────────────────────────
     const fnApi = new lambda.Function(this, 'FnApi', {
@@ -175,6 +187,21 @@ export class SafegaiStack extends cdk.Stack {
     devicesTable.grantReadWriteData(fnApi);
     usersTable.grantReadWriteData(fnApi);
     fcmSecret.grantRead(fnApi);
+    // 계정 관리(admin 전용 API): Cognito 사용자 CRUD
+    fnApi.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:ListUsers',
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminAddUserToGroup',
+        'cognito-idp:AdminRemoveUserFromGroup',
+        'cognito-idp:AdminListGroupsForUser',
+        'cognito-idp:AdminDisableUser',
+        'cognito-idp:AdminEnableUser',
+        'cognito-idp:AdminSetUserPassword',
+      ],
+      resources: [userPool.userPoolArn],
+    }));
 
     // ─── IoT Core: Thing gw-01 ───────────────────────────────────────
     const iotThing = new iot.CfnThing(this, 'ThingGw01', {

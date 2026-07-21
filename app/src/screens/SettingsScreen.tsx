@@ -12,6 +12,7 @@ import messaging from '@react-native-firebase/messaging';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiClient } from '../api/client';
 import { pushStore } from '../stores/pushStore';
+import { useAuthStore } from '../stores/authStore';
 import { colors, typography, spacing, radius, touchTarget } from '../theme/tokens';
 
 interface Props { navigation: any; }
@@ -22,6 +23,7 @@ export function SettingsScreen({ navigation }: Props) {
   const [infoEnabled, setInfoEnabled] = useState(true);
   const [testLoading, setTestLoading] = useState(false);
   const lastPushAt = pushStore((s) => s.lastPushAt);
+  const role = useAuthStore((s) => s.role);
 
   // 화면 포커스 시마다 권한·토큰 상태 재확인 (설정 변경 후 복귀 대응)
   useFocusEffect(
@@ -133,6 +135,20 @@ export function SettingsScreen({ navigation }: Props) {
             {testLoading ? '발송 중...' : '시험 푸시 발송'}
           </Text>
         </TouchableOpacity>
+
+        {/* 계정 관리 (관리자 전용) */}
+        {role === 'admin' && (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>관리</Text>
+            <TouchableOpacity
+              style={styles.testBtn}
+              onPress={() => navigation.navigate('AccountManagement')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.testBtnText}>👥 계정 관리</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
