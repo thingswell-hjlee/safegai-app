@@ -21,10 +21,11 @@ export function extractUserInfo(event) {
   }
 
   const groups = claims['cognito:groups'];
-  // groups는 문자열("[admin, teacher]") 또는 배열
+  // groups는 문자열 또는 배열. API GW JWT authorizer는 배열 claim을
+  // "[teacher admin]"처럼 **공백 구분** 문자열로 넘기므로 쉼표·공백 모두 분리
   let roles = [];
   if (typeof groups === 'string') {
-    roles = groups.replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean);
+    roles = groups.replace(/[\[\]]/g, '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
   } else if (Array.isArray(groups)) {
     roles = groups;
   }
