@@ -58,12 +58,12 @@ export function SettingsScreen({ navigation }: Props) {
     try {
       const res = await apiClient.post('/push/test');
       if (res.data?.ok && res.data?.data?.sent) {
-        Alert.alert('성공', '테스트 푸시가 발송되었습니다.');
+        Alert.alert('보냈습니다', '잠시 후 이 기기로 알림이 도착합니다.\n알림이 오는지 확인해 보세요.');
       } else {
-        Alert.alert('실패', 'FCM 전송에 실패했습니다. 서버 로그를 확인하세요.');
+        Alert.alert('실패했습니다', '알림 시험에 실패했습니다.\n유지보수 담당자에게 문의해 주세요.');
       }
     } catch {
-      Alert.alert('실패', '테스트 푸시 발송에 실패했습니다.');
+      Alert.alert('실패했습니다', '알림 시험에 실패했습니다.\n인터넷 연결을 확인해 주세요.');
     }
     setTestLoading(false);
   }
@@ -75,7 +75,7 @@ export function SettingsScreen({ navigation }: Props) {
 
   const lastPushDisplay = lastPushAt
     ? new Date(lastPushAt).toLocaleString('ko-KR')
-    : '수신 이력 없음';
+    : '아직 받은 알림 없음';
 
   return (
     <View style={styles.container}>
@@ -89,33 +89,33 @@ export function SettingsScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.body}>
-        {/* 푸시 수신 상태 */}
-        <Text style={styles.sectionTitle}>푸시 알림</Text>
+        {/* 알림 상태 */}
+        <Text style={styles.sectionTitle}>알림</Text>
 
         <View style={styles.row}>
-          <Text style={styles.label}>알림 권한</Text>
+          <Text style={styles.label}>알림 허용</Text>
           <Text style={[styles.value, { color: permGranted ? colors.state.ok : colors.severity.danger }]}>
-            {permGranted === null ? '확인 중...' : permGranted ? '허용됨' : '거부됨'}
+            {permGranted === null ? '확인 중...' : permGranted ? '✓ 허용됨' : '✗ 꺼져 있음'}
           </Text>
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.label}>토큰 등록</Text>
+          <Text style={styles.label}>알림 연결</Text>
           <Text style={[styles.value, { color: tokenRegistered ? colors.state.ok : colors.severity.fault }]}>
-            {tokenRegistered ? '등록됨' : '미등록'}
+            {tokenRegistered ? '✓ 연결됨' : '✗ 연결 안 됨'}
           </Text>
         </View>
 
         <View style={styles.row}>
-          <Text style={styles.label}>마지막 수신</Text>
+          <Text style={styles.label}>마지막 알림</Text>
           <Text style={styles.value}>{lastPushDisplay}</Text>
         </View>
 
         {/* INFO 토글 */}
         <View style={[styles.row, { marginTop: spacing.base }]}>
           <View>
-            <Text style={styles.label}>정보(INFO) 알림</Text>
-            <Text style={styles.hint}>위험(DANGER)은 항상 켜짐</Text>
+            <Text style={styles.label}>일반 소식 알림</Text>
+            <Text style={styles.hint}>위험 알림은 항상 켜져 있습니다</Text>
           </View>
           <Switch
             value={infoEnabled}
@@ -132,7 +132,7 @@ export function SettingsScreen({ navigation }: Props) {
           activeOpacity={0.8}
         >
           <Text style={styles.testBtnText}>
-            {testLoading ? '발송 중...' : '시험 푸시 발송'}
+            {testLoading ? '보내는 중...' : '🔔 알림 시험해 보기'}
           </Text>
         </TouchableOpacity>
 

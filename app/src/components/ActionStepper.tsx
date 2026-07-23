@@ -12,15 +12,16 @@ import { UserRole } from '../utils/auth';
 type Status = 'OPEN' | 'ACKED' | 'IN_PROGRESS' | 'RESOLVED';
 
 interface Step {
-  label: string;
+  label: string;        // 진행 표시용 (상태 이름)
+  buttonLabel: string;  // 버튼용 (행동형 문구 — 시니어 배려)
   fromStatus: Status;
   toStatus: Status;
 }
 
 const STEPS: Step[] = [
-  { label: '확인했어요', fromStatus: 'OPEN', toStatus: 'ACKED' },
-  { label: '조치 중', fromStatus: 'ACKED', toStatus: 'IN_PROGRESS' },
-  { label: '완료', fromStatus: 'IN_PROGRESS', toStatus: 'RESOLVED' },
+  { label: '확인', buttonLabel: '✓ 확인했어요', fromStatus: 'OPEN', toStatus: 'ACKED' },
+  { label: '조치 중', buttonLabel: '▶ 조치를 시작할게요', fromStatus: 'ACKED', toStatus: 'IN_PROGRESS' },
+  { label: '완료', buttonLabel: '✓ 조치를 끝냈어요', fromStatus: 'IN_PROGRESS', toStatus: 'RESOLVED' },
 ];
 
 interface Props {
@@ -61,7 +62,7 @@ export function ActionStepper({ currentStatus, role, userId, assigneeUserId, isL
     return (
       <View style={styles.container}>
         <View style={styles.completedBar}>
-          <Text style={styles.completedText}>✓ 조치 완료</Text>
+          <Text style={styles.completedText}>✅ 조치가 모두 끝났습니다</Text>
         </View>
       </View>
     );
@@ -99,12 +100,13 @@ export function ActionStepper({ currentStatus, role, userId, assigneeUserId, isL
         onPress={() => onAction(currentStep.toStatus)}
         disabled={isLoading}
         activeOpacity={0.8}
-        accessibilityLabel={currentStep.label}
+        accessibilityLabel={currentStep.buttonLabel}
+        accessibilityRole="button"
       >
         {isLoading ? (
           <ActivityIndicator color={colors.text.inverse} />
         ) : (
-          <Text style={styles.buttonText}>{currentStep.label}</Text>
+          <Text style={styles.buttonText}>{currentStep.buttonLabel}</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -126,7 +128,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   stepDot: { alignItems: 'center', flex: 1 },
-  dot: { width: 10, height: 10, borderRadius: 5, marginBottom: spacing.xs },
+  dot: { width: 16, height: 16, borderRadius: 8, marginBottom: spacing.xs },
   dotActive: { backgroundColor: colors.brand.navy },
   dotInactive: { backgroundColor: colors.line },
   stepLabel: {

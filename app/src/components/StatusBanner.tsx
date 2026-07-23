@@ -19,18 +19,22 @@ export function StatusBanner({ openCount, gwOffline, onPress }: Props) {
   let message: string;
   let icon: string;
 
+  let hint: string;
   if (gwOffline) {
     bgColor = colors.severity.fault;
     icon = '⊘';
-    message = '현장 연결 지연';
+    message = '현장과 연결이 안 됩니다';
+    hint = '잠시 후에도 계속되면 유지보수 담당자에게 연락하세요';
   } else if (openCount > 0) {
     bgColor = colors.severity.danger;
-    icon = '⚠';
-    message = `${openCount}건 확인 필요`;
+    icon = '⚠️';
+    message = `확인할 알림이 ${openCount}건 있습니다`;
+    hint = '여기를 눌러 확인하세요';
   } else {
     bgColor = colors.state.ok;
-    icon = '✓';
-    message = '현장 정상 운영 중';
+    icon = '✅';
+    message = '지금 현장은 안전합니다';
+    hint = '';
   }
 
   return (
@@ -38,26 +42,37 @@ export function StatusBanner({ openCount, gwOffline, onPress }: Props) {
       style={[styles.banner, { backgroundColor: bgColor }]}
       onPress={onPress}
       activeOpacity={0.8}
-      accessibilityLabel={`${icon} ${message}`}
+      accessibilityLabel={`${message}. ${hint}`}
       accessibilityRole="button"
     >
       <Text style={styles.text}>{icon} {message}</Text>
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   banner: {
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.base,
     borderRadius: radius.card,
     marginHorizontal: spacing.base,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     alignItems: 'center',
+    minHeight: 72,
+    justifyContent: 'center',
   },
   text: {
-    fontSize: typography.body.fontSize,
-    fontWeight: '700',
+    fontSize: typography.title.fontSize,
+    fontWeight: '800',
     color: colors.text.inverse,
+    textAlign: 'center',
+  },
+  hint: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
+    color: colors.text.inverse,
+    opacity: 0.9,
+    marginTop: spacing.xs,
   },
 });

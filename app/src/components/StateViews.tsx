@@ -20,7 +20,7 @@ interface EmptyProps {
   message?: string;
 }
 
-export function EmptyState({ message = '표시할 데이터가 없습니다' }: EmptyProps) {
+export function EmptyState({ message = '표시할 내용이 없습니다' }: EmptyProps) {
   return (
     <View style={styles.center}>
       <Text style={styles.icon}>📋</Text>

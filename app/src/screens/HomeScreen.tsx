@@ -3,7 +3,7 @@
  * '현장 지연' = site/state의 gw online:false.
  */
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useAuthStore } from '../stores/authStore';
 import { useEventsQuery, useSiteStateQuery } from '../api/queries';
 import { SafegaiEvent } from '../stores/eventStore';
@@ -17,6 +17,11 @@ import { colors, typography, spacing } from '../theme/tokens';
 interface Props {
   navigation: any;
 }
+
+// 역할 한글 표기 (비전문가 배려 — 영문 노출 금지)
+const ROLE_KO: Record<string, string> = {
+  admin: '관리자', teacher: '교사', operator: '운영', maintainer: '유지보수',
+};
 
 export function HomeScreen({ navigation }: Props) {
   const { email, role, logout } = useAuthStore();
@@ -48,15 +53,31 @@ export function HomeScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>SafeGAI</Text>
-          <Text style={styles.headerSub}>{email} ({role})</Text>
+          <Text style={styles.headerSub}>{email}</Text>
+          <Text style={styles.headerSub}>{ROLE_KO[role ?? ''] || role}</Text>
         </View>
         <View style={styles.headerRight}>
           <FreshnessLabel lastUpdatedAt={lastUpdated} />
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.logoutBtn}>
-            <Text style={styles.logoutText}>설정</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel="설정 화면 열기"
+          >
+            <Text style={styles.headerBtnText}>⚙ 설정</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-            <Text style={styles.logoutText}>로그아웃</Text>
+          <TouchableOpacity
+            onPress={() =>
+              Alert.alert('로그아웃', '로그아웃 하시겠습니까?', [
+                { text: '취소', style: 'cancel' },
+                { text: '로그아웃', style: 'destructive', onPress: logout },
+              ])
+            }
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel="로그아웃"
+          >
+            <Text style={styles.headerBtnText}>로그아웃</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -103,9 +124,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: typography.title.fontSize, fontWeight: typography.title.fontWeight, color: colors.text.inverse },
   headerSub: { fontSize: typography.caption.fontSize, fontWeight: typography.caption.fontWeight, color: colors.text.inverse, opacity: 0.8 },
-  headerRight: { alignItems: 'flex-end', gap: spacing.xs },
-  logoutBtn: { padding: spacing.xs },
-  logoutText: { fontSize: typography.caption.fontSize, fontWeight: typography.caption.fontWeight, color: colors.text.inverse },
+  headerRight: { alignItems: 'flex-end', gap: spacing.sm },
+  headerBtn: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 8,
+    minHeight: 44, justifyContent: 'center',
+  },
+  headerBtnText: { fontSize: typography.caption.fontSize, fontWeight: '700', color: colors.text.inverse },
   section: { padding: spacing.base, flex: 1 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   sectionTitle: { fontSize: typography.title.fontSize, fontWeight: typography.title.fontWeight, color: colors.text.main },

@@ -3,19 +3,28 @@
  *
  * 이메일+비밀번호 → Amplify Auth → 성공 시 홈 직행
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../stores/authStore';
 import { colors, typography, spacing, radius, touchTarget } from '../theme/tokens';
+
+const LAST_EMAIL_KEY = 'last_login_email';
 
 export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, isLoading, error, clearError } = useAuthStore();
 
+  // 마지막 로그인 이메일 자동 채움 (매번 입력하는 부담 제거)
+  useEffect(() => {
+    AsyncStorage.getItem(LAST_EMAIL_KEY).then((v) => { if (v) setEmail(v); });
+  }, []);
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) return;
     clearError();
+    await AsyncStorage.setItem(LAST_EMAIL_KEY, email.trim());
     await login(email.trim(), password);
   };
 
@@ -27,28 +36,32 @@ export function LoginScreen() {
       </View>
 
       <View style={styles.form}>
+        <Text style={styles.fieldLabel}>이메일 주소</Text>
         <TextInput
           style={styles.input}
-          placeholder="이메일"
-          placeholderTextColor={colors.text.sub}
+          placeholder="예: hong@thingswell.co.kr"
+          placeholderTextColor="#9AA3AF"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
           editable={!isLoading}
+          accessibilityLabel="이메일 주소 입력"
         />
+        <Text style={styles.fieldLabel}>비밀번호</Text>
         <TextInput
           style={styles.input}
-          placeholder="비밀번호"
-          placeholderTextColor={colors.text.sub}
+          placeholder="비밀번호를 입력하세요"
+          placeholderTextColor="#9AA3AF"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           editable={!isLoading}
+          accessibilityLabel="비밀번호 입력"
         />
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={styles.error}>⚠️ {error}</Text>}
 
         <TouchableOpacity
           style={[styles.button, isLoading && styles.buttonDisabled]}
@@ -90,7 +103,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   form: {
-    gap: spacing.base,
+    gap: spacing.sm,
+  },
+  fieldLabel: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '700',
+    color: colors.text.main,
+    marginTop: spacing.sm,
   },
   input: {
     backgroundColor: colors.bg.card,

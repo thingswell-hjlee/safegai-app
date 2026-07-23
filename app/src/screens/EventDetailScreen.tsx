@@ -49,11 +49,11 @@ export function EventDetailScreen({ route, navigation }: Props) {
         <View style={styles.infoGrid}>
           <InfoRow label="발생 시각" value={time} />
           <InfoRow label="위치" value={event.location || '-'} />
-          <InfoRow label="기기" value={event.deviceId} />
+          <InfoRow label="기기" value={DEVICE_KO[event.deviceId] || event.deviceId} />
           {event.currentValue != null && (
             <InfoRow label="측정값" value={`${event.currentValue}${event.unit}`} />
           )}
-          <InfoRow label="이벤트 유형" value={event.eventType} />
+          <InfoRow label="종류" value={TYPE_KO[event.eventType] || event.eventType} />
         </View>
       </ScrollView>
 
@@ -72,6 +72,18 @@ export function EventDetailScreen({ route, navigation }: Props) {
     </View>
   );
 }
+
+// 영문 코드 → 쉬운 한글 (비전문가 배려)
+const TYPE_KO: Record<string, string> = {
+  TEMP: '온도', HUMIDITY: '습도', PM25: '미세먼지(PM2.5)', PM10: '미세먼지(PM10)',
+  CO2: '이산화탄소', TVOC: '공기질(TVOC)', OVEN_TEMP: '오븐 온도',
+  GATEWAY_OFFLINE: '현장 연결 끊김', DEVICE_FAULT: '장비 이상', DEVICE_RECOVER: '장비 복구',
+  AI_INTRUSION: '위험구역 접근', AI_OCCUPANCY: '인원 감지', DIAG: '점검',
+};
+const DEVICE_KO: Record<string, string> = {
+  'FG-01': '환경센서', 'SG-01': '경보장치', 'FID-01': 'AI 카메라',
+  GW: '게이트웨이', 'gw-01': '게이트웨이',
+};
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (

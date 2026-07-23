@@ -23,18 +23,19 @@ export const colors = {
   line: '#E5EAF1',
   text: {
     main: '#1A2233',
-    sub: '#6B7280',
+    sub: '#4B5563',   // 접근성: 저대비 회색(#6B7280) → 진하게 (50~60대 저시력 대비)
     inverse: '#FFFFFF',
   },
 } as const;
 
+// 접근성 개선(2026-07): 50~60대·비전문가 대상 — 전 단계 글자 확대
 export const typography = {
-  display: { fontSize: 24, fontWeight: '800' as const },
-  title: { fontSize: 18, fontWeight: '700' as const },
-  body: { fontSize: 15, fontWeight: '400' as const },
-  caption: { fontSize: 12.5, fontWeight: '500' as const },
-  value: { fontSize: 28, fontWeight: '800' as const },
-  badge: { fontSize: 11.5, fontWeight: '800' as const },
+  display: { fontSize: 30, fontWeight: '800' as const },
+  title: { fontSize: 22, fontWeight: '700' as const },
+  body: { fontSize: 18, fontWeight: '400' as const },
+  caption: { fontSize: 15, fontWeight: '500' as const },
+  value: { fontSize: 34, fontWeight: '800' as const },
+  badge: { fontSize: 14, fontWeight: '800' as const },
 } as const;
 
 export const spacing = {
@@ -52,6 +53,6 @@ export const radius = {
 } as const;
 
 export const touchTarget = {
-  min: 48,
-  gap: 8,
+  min: 56,   // 접근성: 48 → 56 (손떨림·큰 손가락 배려)
+  gap: 12,
 } as const;

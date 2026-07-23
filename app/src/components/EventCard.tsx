@@ -76,11 +76,11 @@ const styles = StyleSheet.create({
   dangerBg: {
     backgroundColor: '#FEF2F2', // 연빨강 (danger 10% opacity 상당)
   },
-  sevBar: { width: 4 },
-  content: { flex: 1, padding: spacing.md, gap: spacing.xs },
+  sevBar: { width: 6 },
+  content: { flex: 1, padding: spacing.base, gap: spacing.sm },
   title: {
     fontSize: typography.body.fontSize,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text.main,
   },
   meta: {
